@@ -1,3 +1,6 @@
+// TODO
+// - reuse steamcmd process
+
 use anyhow::{Context, Result};
 use once_cell::sync::Lazy;
 use rustyline::{Editor, error::ReadlineError};
@@ -93,6 +96,7 @@ impl ManagerPaths {
             .parent()
             .context("Steam CMD path has no parent directory")?;
         Ok(parent
+            .join("necodl")
             .join("steamapps")
             .join("workshop")
             .join("content")
@@ -303,7 +307,7 @@ impl WorkshopManager {
         Ok(current_hash == file_info.hash)
     }
 
-    async fn run_steamcmd(&self, args: &[&str]) -> Result<bool> {
+    async fn run_steamcmd(&self, args: &[&str], verbose: bool) -> Result<bool> {
         let mut child = Command::new(&self.paths.steamcmd)
             .args(args)
             .stdout(Stdio::piped())
@@ -320,6 +324,9 @@ impl WorkshopManager {
 
         let mut success = false;
         while let Some(line) = lines.next_line().await? {
+            if verbose {
+                println!("{}", line);
+            }
             if line.contains("Success. Downloaded item") || line.contains("item state : 4") {
                 success = true;
                 break;
@@ -546,6 +553,8 @@ impl WorkshopManager {
         }
 
         let args = [
+            "+force_install_dir",
+            "./necodl",
             "+login",
             "anonymous",
             "+workshop_download_item",
@@ -554,7 +563,7 @@ impl WorkshopManager {
             "+quit",
         ];
 
-        if !self.run_steamcmd(&args).await? {
+        if !self.run_steamcmd(&args, false).await? {
             eprintln!("Failed to download {}", item.id);
             return Ok(false);
         }

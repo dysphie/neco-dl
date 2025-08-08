@@ -53,3 +53,7 @@ workshop_cfgs = [
     "./nmrihserver2/workshop_maps.txt"
 ]
 ```
+
+> \[!TIP]
+> Instead of setting your download folder to your server's maps folder, you can dynamically mount it by adding `game+mod <path>` to your `gameinfo.txt`.
+

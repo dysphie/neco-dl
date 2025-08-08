@@ -1,0 +1,19 @@
+name: Rust CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Rust stable (minimal profile)
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Set Rust stable as default
+        run: rustup default stable
+
+      - name: Build project
+        run: cargo build --verbose

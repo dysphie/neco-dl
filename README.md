@@ -1,7 +1,7 @@
 
 <img height="128" alt="necodl" src="https://github.com/user-attachments/assets/0496c628-9dfb-42cf-980f-5e821fb8670d" />
 
-# (WIP) necodl
+# NecoDL
 
 A Workshop addon manager for SRCDS.
 

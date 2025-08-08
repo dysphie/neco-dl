@@ -1,5 +1,5 @@
 
-<img height="128" alt="necodl" src="https://github.com/user-attachments/assets/0496c628-9dfb-42cf-980f-5e821fb8670d" />
+<img height="128" alt="necoDL icon" src="https://github.com/user-attachments/assets/65c94234-faca-4b64-9487-e91cf232f543" />
 
 # NecoDL
 

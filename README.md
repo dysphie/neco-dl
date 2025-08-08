@@ -1,6 +1,9 @@
-# (WIP) necodl
 
-A Workshop addon manager for SRCDS.
+<img height="128" alt="necoDL icon" src="https://github.com/user-attachments/assets/65c94234-faca-4b64-9487-e91cf232f543" />
+
+# NecoDL
+
+A Workshop addon manager for Source Engine Dedicated Servers
 
 I built this as a workaround for Steam API issues where valid workshop entries fail to return data, making the built-in workshop tools not work.
 

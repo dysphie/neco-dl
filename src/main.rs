@@ -49,6 +49,7 @@ struct WorkshopItem {
 }
 
 struct WorkshopCollection {
+    id: String,
     title: String,
     item_ids: Vec<String>,
 }
@@ -224,6 +225,7 @@ impl WorkshopManager {
             .collect();
 
         Ok(ParseResult::Collection(WorkshopCollection {
+            id: workshop_id.to_string(),
             title,
             item_ids,
         }))
@@ -535,7 +537,6 @@ impl WorkshopManager {
         collection_id: Option<&str>,
     ) -> Result<bool> {
         println!("Downloading {} ({})...", item.id, item.title);
-
         if self.quick_update(&item, collection_id).await? {
             return Ok(true);
         }
@@ -613,7 +614,7 @@ impl WorkshopManager {
                 .context("Failed to fetch file info in collection")?;
 
             if let ParseResult::Item(file_item) = file {
-                self.download_item(file_item, Some(&collection.title))
+                self.download_item(file_item, Some(&collection.id))
                     .await?;
             }
         }

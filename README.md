@@ -1,8 +1,15 @@
 # necodl
 
-A standalone Workshop addon manager for SRCDS.
+A Workshop addon manager for SRCDS.
 
 I built this as a workaround for Steam API issues where valid workshop entries fail to return data, making the built-in workshop tools not work.
+
+---
+
+## Requirements
+
+* You must have [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD#Downloading_SteamCMD) downloaded and available on your system.
+* Set the `steam_cmd` path in the config to point to your steamcmd executable
 
 ---
 
@@ -27,7 +34,6 @@ I built this as a workaround for Steam API issues where valid workshop entries f
 | `help`               | Displays the list of available commands and their descriptions.                                                                                                                                     |
 | `exit`               | Exits the application.                                                                                                                                                                              |
 
-
 ---
 
 ## Config
@@ -36,7 +42,7 @@ Example configuration file:
 
 ```toml
 steam_cmd = "./steamcmd/steamcmd.exe"      # path to steamcmd (.exe or .sh)
-download_dir = "./downloads"         # directory to move downloaded files
+download_dir = "./downloads"                # directory to move downloaded files
 appid = "224260"
 
 # For NMRiH only:
@@ -47,4 +53,3 @@ workshop_cfgs = [
     "./nmrihserver2/workshop_maps.txt"
 ]
 ```
-

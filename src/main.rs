@@ -330,18 +330,18 @@ impl WorkshopManager {
         Ok(success || status.success())
     }
 
-    async fn copy_and_track_files(&self, src: &Path, dest: &Path) -> Result<Vec<FileInfo>> {
+    async fn move_and_track_files(&self, src: &Path, dest: &Path) -> Result<Vec<FileInfo>> {
         if !fs::try_exists(src).await? {
             return Ok(Vec::new());
         }
 
         fs::create_dir_all(dest).await?;
         let mut files = Vec::new();
-        self.copy_directory(src, dest, &mut files).await?;
+        self.move_directory(src, dest, &mut files).await?;
         Ok(files)
     }
 
-    async fn copy_directory(
+    async fn move_directory(
         &self,
         src: &Path,
         dest: &Path,
@@ -366,6 +366,8 @@ impl WorkshopManager {
                 } else {
                     let hash = self.calculate_file_hash(&src_path).await?;
                     fs::copy(&src_path, &dest_path).await?;
+                    fs::remove_file(&src_path).await?;
+
                     let relative_path = dest_path
                         .strip_prefix(&self.paths.local_files)
                         .unwrap_or(&dest_path)
@@ -378,6 +380,8 @@ impl WorkshopManager {
                     });
                 }
             }
+
+            // todo: remove empty dir
         }
 
         Ok(())
@@ -566,7 +570,7 @@ impl WorkshopManager {
         }
 
         let files = self
-            .copy_and_track_files(&source_path, &self.paths.local_files)
+            .move_and_track_files(&source_path, &self.paths.local_files)
             .await?;
 
         if files.is_empty() {
@@ -614,8 +618,7 @@ impl WorkshopManager {
                 .context("Failed to fetch file info in collection")?;
 
             if let ParseResult::Item(file_item) = file {
-                self.download_item(file_item, Some(&collection.id))
-                    .await?;
+                self.download_item(file_item, Some(&collection.id)).await?;
             }
         }
 

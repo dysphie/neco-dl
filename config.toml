@@ -1,0 +1,11 @@
+steam_cmd = "./steamcmd/steamcmd.exe"      # path to steamcmd (.exe or .sh)
+download_dir = "./downloads"         # directory to move downloaded files
+appid = "224260"
+
+# For NMRiH only:
+# List of workshop_maps.txt files to edit after download
+# Needed so clients download the map on join
+workshop_cfgs = [
+    "./nmrihserver1/workshop_maps.txt",
+    "./nmrihserver2/workshop_maps.txt"
+]

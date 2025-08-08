@@ -1,0 +1,6 @@
+/target
+/downloads
+/steamcmd
+metadata.json
+Cargo.lock
+.history

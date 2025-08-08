@@ -3,24 +3,17 @@
 
 # NecoDL
 
-A Workshop addon manager for Source Engine Dedicated Servers
+A CLI Workshop addon manager for Source Engine Dedicated Servers.
 
 I built this as a workaround for Steam API issues where valid workshop entries fail to return data, making the built-in workshop tools not work.
 
 ---
 
-## Requirements
+## Usage
 
-* You must have [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD#Downloading_SteamCMD) downloaded and available on your system.
-* Set the `steam_cmd` path in the config to point to your steamcmd executable
-
----
-
-## Launching the tool
-
-```sh
-./necodl
-```
+* Grab the latest binary from the [releases](https://github.com/dysphie/neco-dl/releases) page.
+* Adjust the settings in the [config](https://github.com/dysphie/neco-dl?tab=readme-ov-file#config) file.
+* Launch the tool in the terminal with: `./necodl`
 
 ---
 
@@ -32,7 +25,7 @@ I built this as a workaround for Steam API issues where valid workshop entries f
 | `remove <file_id>`   | Unsubscribes from a Workshop file. If it's a collection, all included items are removed (unless shared with another collection)                          |
 | `list`               | Lists all current Workshop subscriptions. Use `-v` for detailed info.                                                                                                                               |
 | `update`             | Updates all existing Workshop subscriptions.                                                                                               |
-| `generate`           | Generates the `workshop_maps.txt` file from your current subscriptions.                                                                                                                             |
+| `generate`           | (NMRiH) Generates `workshop_maps.txt` files from your current subscriptions.                                                                                                                             |
 | `info`               | Shows configuration details and current status information.                                                                                                                                         |
 | `help`               | Displays the list of available commands and their descriptions.                                                                                                                                     |
 | `exit`               | Exits the application.                                                                                                                                                                              |

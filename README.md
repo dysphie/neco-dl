@@ -37,8 +37,8 @@ I built this as a workaround for Steam API issues where valid workshop entries f
 Example configuration file:
 
 ```toml
-steam_cmd = "./steamcmd/steamcmd.exe"      # path to steamcmd (.exe or .sh)
-download_dir = "./downloads"                # directory to move downloaded files
+steam_cmd = "./steamcmd/steamcmd.exe" # Path to SteamCMD (.exe or .sh)
+download_dir = "./downloads" # Where to place downloaded files after download
 appid = "224260"
 
 # For NMRiH only:

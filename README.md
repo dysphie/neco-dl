@@ -25,10 +25,10 @@ I built this as a workaround for Steam API issues where valid workshop entries f
 
 | command              | description                                                                                                                                                                                         |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `download <file_id>` | Subscribes to a Workshop file and downloads it. If it's a collection, all items are downloaded individually. Uses local cache to skip files already up to date. Add `--force` to force re-download. |
-| `remove <file_id>`   | Unsubscribes from a Workshop file. If it's a collection, all included maps are removed (unless shared with another collection). Collections also remove orphaned items.                             |
+| `download <file_id>` | Subscribes to a Workshop file and downloads it. If it's a collection, all items are downloaded individually. |
+| `remove <file_id>`   | Unsubscribes from a Workshop file. If it's a collection, all included items are removed (unless shared with another collection)                          |
 | `list`               | Lists all current Workshop subscriptions. Use `-v` for detailed info.                                                                                                                               |
-| `update`             | Updates all existing Workshop subscriptions. Skips up-to-date files unless `--force` is used.                                                                                                       |
+| `update`             | Updates all existing Workshop subscriptions.                                                                                               |
 | `generate`           | Generates the `workshop_maps.txt` file from your current subscriptions.                                                                                                                             |
 | `info`               | Shows configuration details and current status information.                                                                                                                                         |
 | `help`               | Displays the list of available commands and their descriptions.                                                                                                                                     |

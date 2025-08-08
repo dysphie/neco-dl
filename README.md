@@ -34,7 +34,7 @@ I built this as a workaround for Steam API issues where valid workshop entries f
 
 ## Config
 
-Example configuration file:
+Settings are stored in `config.toml`
 
 ```toml
 steam_cmd = "./steamcmd/steamcmd.exe" # Path to SteamCMD (.exe or .sh)

@@ -2,6 +2,7 @@
 // - reuse steamcmd process
 
 use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use once_cell::sync::Lazy;
 use rustyline::{Editor, error::ReadlineError};
@@ -14,7 +15,6 @@ use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::Duration;
-use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "workshop_manager")]
@@ -43,8 +43,10 @@ enum Commands {
         workshop_id: String,
     },
     Info,
+    Import {
+        path: String,
+    },
 }
-
 
 static TITLE_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse(".workshopItemTitle").unwrap());
@@ -99,7 +101,7 @@ pub struct WorkshopManager {
     paths: ManagerPaths,
     metadata: HashMap<String, WorkshopMetadata>,
     client: reqwest::Client,
-    whitelist: Option<GlobSet>
+    whitelist: Option<GlobSet>,
 }
 
 struct ManagerPaths {
@@ -149,7 +151,7 @@ impl WorkshopManager {
 
         let whitelist = if !config.whitelist.is_empty() {
             let mut builder = GlobSetBuilder::new();
-            
+
             for pattern in &config.whitelist {
                 let glob = Glob::new(pattern)
                     .with_context(|| format!("Invalid glob pattern: {}", pattern))?;
@@ -171,7 +173,7 @@ impl WorkshopManager {
             paths,
             metadata: HashMap::new(),
             client,
-            whitelist // globset
+            whitelist, // globset
         };
 
         mgr.load_metadata().await?;
@@ -742,6 +744,68 @@ impl WorkshopManager {
         Ok(())
     }
 
+    async fn cmd_import(&mut self, path: &str) -> Result<()> {
+        let import_path = PathBuf::from(path);
+        if !import_path.exists() {
+            anyhow::bail!("File not found: {}", path);
+        }
+
+        let content = fs::read_to_string(&import_path)
+            .await
+            .with_context(|| format!("Failed to read {}", path))?;
+
+        let mut imported_count = 0;
+        let mut in_workshop_maps = false;
+
+        for line in content.lines() {
+            let line = line.trim();
+
+            if line.is_empty() || line.starts_with("//") {
+                continue;
+            }
+
+            if line == "\"WorkshopMaps\"" {
+                in_workshop_maps = true;
+                continue;
+            }
+
+            if !in_workshop_maps {
+                continue;
+            }
+
+            if line == "}" {
+                break;
+            }
+
+            if line.starts_with('"') {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let map_name = parts[0].trim_matches('"');
+                    let workshop_id = parts[1].trim_matches('"');
+
+                    if workshop_id.parse::<u64>().is_ok()
+                        && !self.metadata.contains_key(workshop_id)
+                    {
+                        self.metadata.insert(
+                            workshop_id.to_string(),
+                            WorkshopMetadata {
+                                title: map_name.to_string(),
+                                changelog_id: "0".to_string(),
+                                files: Vec::new(),
+                                collection_ids: Vec::new(),
+                            },
+                        );
+                        imported_count += 1;
+                    }
+                }
+            }
+        }
+
+        self.save_metadata().await?;
+        println!("Imported {} workshop IDs. Use 'update' to download them", imported_count);
+        Ok(())
+    }
+
     async fn cmd_update(&mut self, args: &[&str]) -> Result<()> {
         let force = args.contains(&"-f") || args.contains(&"--force");
 
@@ -859,6 +923,7 @@ impl WorkshopManager {
         println!("  remove <id>     - Remove workshop item or collection");
         println!("                    (collections remove orphaned items)");
         println!("  info            - Show configuration and status information");
+        println!("  import <path>    - Import workshop IDs from workshop_maps.txt");
         println!("  help            - Show this help");
         println!("  exit            - Exit application");
         println!();
@@ -886,6 +951,13 @@ impl WorkshopManager {
                     self.cmd_remove(id).await?;
                 } else {
                     println!("Usage: remove <workshop_id>");
+                }
+            }
+            "import" => {
+                if let Some(path) = parts.get(1) {
+                    self.cmd_import(path).await?;
+                } else {
+                    println!("Usage: import <path_to_workshop_maps.txt>");
                 }
             }
             "info" => self.cmd_info().await?,
@@ -950,7 +1022,9 @@ async fn main() -> Result<()> {
             manager.download_generic(&workshop_id, force).await?;
         }
         Some(Commands::Update { force }) => {
-            manager.cmd_update(&if force { vec!["--force"] } else { vec![] }).await?;
+            manager
+                .cmd_update(&if force { vec!["--force"] } else { vec![] })
+                .await?;
         }
         Some(Commands::List { verbose }) => {
             manager.cmd_list(verbose).await?;
@@ -960,6 +1034,9 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Info) => {
             manager.cmd_info().await?;
+        }
+        Some(Commands::Import { path }) => {
+            manager.cmd_import(&path).await?;
         }
         None => {
             manager.run().await?; // interactive mode

@@ -1,7 +1,9 @@
 // TODO
 // - reuse steamcmd process
+// - clap crate
 
 use anyhow::{Context, Result};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use once_cell::sync::Lazy;
 use rustyline::{Editor, error::ReadlineError};
 use scraper::{Html, Selector};
@@ -25,8 +27,8 @@ static ITEM_SELECTOR: Lazy<Selector> =
 struct Config {
     appid: String,
     steam_cmd: String,
-    download_dir: String,
-    workshop_cfgs: Vec<String>,
+    output_dir: String,
+    whitelist: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,26 +69,26 @@ pub struct WorkshopManager {
     paths: ManagerPaths,
     metadata: HashMap<String, WorkshopMetadata>,
     client: reqwest::Client,
+    whitelist: Option<GlobSet>
 }
 
 struct ManagerPaths {
     local_files: PathBuf,
-    workshop_cfgs: Vec<PathBuf>,
     steamcmd: PathBuf,
     metadata_file: PathBuf,
+    workshop_maps_file: PathBuf,
 }
 
 impl ManagerPaths {
     fn new(config: &Config) -> Result<Self> {
         let current_dir = std::env::current_dir().context("Failed to get current directory")?;
         let steamcmd = PathBuf::from(&config.steam_cmd);
-        let workshop_cfgs = config.workshop_cfgs.iter().map(PathBuf::from).collect();
 
         Ok(Self {
-            local_files: PathBuf::from(&config.download_dir),
-            workshop_cfgs,
+            local_files: PathBuf::from(&config.output_dir),
             steamcmd,
             metadata_file: current_dir.join("metadata.json"),
+            workshop_maps_file: PathBuf::from(&config.output_dir).join("workshop_maps.txt"),
         })
     }
 
@@ -115,6 +117,20 @@ impl WorkshopManager {
             .await
             .context("Failed to create download directory")?;
 
+        let whitelist = if !config.whitelist.is_empty() {
+            let mut builder = GlobSetBuilder::new();
+            
+            for pattern in &config.whitelist {
+                let glob = Glob::new(pattern)
+                    .with_context(|| format!("Invalid glob pattern: {}", pattern))?;
+                builder.add(glob);
+            }
+
+            Some(builder.build()?)
+        } else {
+            None
+        };
+
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -125,6 +141,7 @@ impl WorkshopManager {
             paths,
             metadata: HashMap::new(),
             client,
+            whitelist // globset
         };
 
         mgr.load_metadata().await?;
@@ -138,12 +155,24 @@ impl WorkshopManager {
         toml::from_str(&content).context("Failed to parse config.toml")
     }
 
+    fn is_allowed(&self, file_path: &Path) -> bool {
+        let Some(ref globset) = self.whitelist else {
+            return false;
+        };
+
+        let relative_path = file_path
+            .strip_prefix(&self.paths.local_files)
+            .unwrap_or(file_path);
+
+        globset.is_match(relative_path)
+    }
+
     fn validate_config(config: &Config) -> Result<()> {
         if config.appid.trim().is_empty() {
             anyhow::bail!("appid must not be empty in config.toml");
         }
-        if config.download_dir.trim().is_empty() {
-            anyhow::bail!("download_dir must not be empty in config.toml");
+        if config.output_dir.trim().is_empty() {
+            anyhow::bail!("output_dir must not be empty in config.toml");
         }
         if config.steam_cmd.trim().is_empty() {
             anyhow::bail!("steam_cmd must not be empty in config.toml");
@@ -267,9 +296,40 @@ impl WorkshopManager {
         }
 
         self.save_metadata().await?;
+        self.update_workshop_maps().await?;
 
-        println!("Successfully downloaded {}", item.id);
+        println!("Successfully downloaded {} (up-to-date, skipped)", item.id);
         Ok(true)
+    }
+
+    async fn update_workshop_maps(&self) -> Result<()> {
+        let mut content = String::from("\"WorkshopMaps\"\n{\n");
+        let mut map_count = 0;
+
+        for (workshop_id, metadata) in &self.metadata {
+            if let Some(map_name) = self.extract_map_name(metadata) {
+                content.push_str(&format!("\t\"{}\"\t\t\"{}\"\n", map_name, workshop_id));
+                map_count += 1;
+            }
+        }
+
+        content.push_str("}\n");
+
+        if let Some(parent) = self.paths.workshop_maps_file.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        fs::write(&self.paths.workshop_maps_file, content)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to write workshop maps to {}",
+                    self.paths.workshop_maps_file.display()
+                )
+            })?;
+
+        // println!("Updated workshop_maps.txt with {} map entries", map_count);
+        Ok(())
     }
 
     async fn calculate_file_hash(&self, path: &Path) -> Result<String> {
@@ -354,41 +414,42 @@ impl WorkshopManager {
         dest: &Path,
         files: &mut Vec<FileInfo>,
     ) -> Result<()> {
-        let mut stack = vec![(src.to_path_buf(), dest.to_path_buf())];
+        let mut stack = vec![(src.to_path_buf(), PathBuf::new())];
 
-        while let Some((src_dir, dest_dir)) = stack.pop() {
+        while let Some((src_dir, rel_dir)) = stack.pop() {
             if !fs::try_exists(&src_dir).await? {
                 continue;
             }
+
+            let dest_dir = dest.join(&rel_dir);
             fs::create_dir_all(&dest_dir).await?;
 
             let mut entries = fs::read_dir(&src_dir).await?;
             while let Some(entry) = entries.next_entry().await? {
                 let src_path = entry.path();
-                let dest_path = dest_dir.join(entry.file_name());
+                let file_name = entry.file_name();
+                let rel_path = rel_dir.join(&file_name);
                 let meta = fs::metadata(&src_path).await?;
 
                 if meta.is_dir() {
-                    stack.push((src_path, dest_path));
+                    stack.push((src_path, rel_path));
                 } else {
+                    if !self.is_allowed(&rel_path) {
+                        println!("Skipping {} - not in whitelist", rel_path.display());
+                        continue;
+                    }
+
+                    let dest_path = dest.join(&rel_path);
                     let hash = self.calculate_file_hash(&src_path).await?;
                     fs::copy(&src_path, &dest_path).await?;
                     fs::remove_file(&src_path).await?;
 
-                    let relative_path = dest_path
-                        .strip_prefix(&self.paths.local_files)
-                        .unwrap_or(&dest_path)
-                        .to_string_lossy()
-                        .to_string();
-
                     files.push(FileInfo {
-                        path: relative_path,
+                        path: rel_path.to_string_lossy().to_string(),
                         hash,
                     });
                 }
             }
-
-            // todo: remove empty dir
         }
 
         Ok(())
@@ -437,12 +498,7 @@ impl WorkshopManager {
         println!("\n{:-<60}", " CONFIGURATION ");
         println!("{:<25}: {}", "App ID", self.config.appid);
         println!("{:<25}: {}", "SteamCMD Path", self.config.steam_cmd);
-        println!("{:<25}: {}", "Download Directory", self.config.download_dir);
-        println!(
-            "{:<25}: {} files",
-            "Workshop CFGs",
-            self.config.workshop_cfgs.len()
-        );
+        println!("{:<25}: {}", "Download Directory", self.config.output_dir);
     }
 
     fn display_paths_info(&self) {
@@ -458,10 +514,6 @@ impl WorkshopManager {
             self.paths.local_files.display()
         );
         println!("{:<25}: {}", "SteamCMD", self.paths.steamcmd.display());
-        println!("Workshop CFG Locations:");
-        for (i, path) in self.paths.workshop_cfgs.iter().enumerate() {
-            println!("  {:<23}: {}", format!("Config #{}", i + 1), path.display());
-        }
     }
 
     async fn display_subscription_info(&self) -> Result<()> {
@@ -498,10 +550,10 @@ impl WorkshopManager {
     async fn display_storage_info(&self) -> Result<()> {
         println!("\n{:-<60}", " STORAGE ");
 
-        let download_dir = &self.paths.local_files;
-        let used_space = self.calculate_directory_size(download_dir).await?;
+        let output_dir = &self.paths.local_files;
+        let used_space = self.calculate_directory_size(output_dir).await?;
 
-        println!("{:<25}: {}", "Download Directory", download_dir.display());
+        println!("{:<25}: {}", "Download Directory", output_dir.display());
         println!("{:<25}: {}", "Used Space", format_file_size(used_space));
 
         Ok(())
@@ -515,16 +567,35 @@ impl WorkshopManager {
         Ok(())
     }
 
-    async fn cmd_download(&mut self, workshop_id: &str) -> Result<()> {
-        if workshop_id.is_empty() {
-            println!("usage: download <workshop_id>");
+    async fn cmd_download(&mut self, args: &[&str]) -> Result<()> {
+        if args.is_empty() {
+            println!("usage: download [-f|--force] <workshop_id>");
             return Ok(());
         }
 
-        self.download_generic(workshop_id).await
+        let mut force = false;
+        let mut workshop_id = "";
+
+        for arg in args {
+            match *arg {
+                "-f" | "--force" => force = true,
+                id if !id.starts_with('-') => workshop_id = id,
+                _ => {
+                    println!("Unknown option: {}", arg);
+                    return Ok(());
+                }
+            }
+        }
+
+        if workshop_id.is_empty() {
+            println!("workshop_id is required");
+            return Ok(());
+        }
+
+        self.download_generic(workshop_id, force).await
     }
 
-    async fn download_generic(&mut self, workshop_id: &str) -> Result<()> {
+    async fn download_generic(&mut self, workshop_id: &str, force: bool) -> Result<()> {
         let item = self
             .parse_workshop_item(workshop_id)
             .await
@@ -532,10 +603,10 @@ impl WorkshopManager {
 
         match item {
             ParseResult::Item(file) => {
-                self.download_item(file, None).await?;
+                self.download_item(file, None, force).await?;
             }
             ParseResult::Collection(collection) => {
-                self.download_collection(collection).await?;
+                self.download_collection(collection, force).await?;
             }
         }
 
@@ -546,9 +617,10 @@ impl WorkshopManager {
         &mut self,
         item: WorkshopItem,
         collection_id: Option<&str>,
+        force: bool,
     ) -> Result<bool> {
-        println!("Downloading {} ({})...", item.id, item.title);
-        if self.quick_update(&item, collection_id).await? {
+        println!("Downloading {}...", item.id);
+        if !force && self.quick_update(&item, collection_id).await? {
             return Ok(true);
         }
 
@@ -613,7 +685,11 @@ impl WorkshopManager {
         Ok(true)
     }
 
-    async fn download_collection(&mut self, collection: WorkshopCollection) -> Result<()> {
+    async fn download_collection(
+        &mut self,
+        collection: WorkshopCollection,
+        force: bool,
+    ) -> Result<()> {
         println!(
             "Downloading collection: {} ({} items)",
             collection.title,
@@ -627,36 +703,34 @@ impl WorkshopManager {
                 .context("Failed to fetch file info in collection")?;
 
             if let ParseResult::Item(file_item) = file {
-                self.download_item(file_item, Some(&collection.id)).await?;
+                self.download_item(file_item, Some(&collection.id), force)
+                    .await?;
             }
         }
 
         Ok(())
     }
 
-    async fn cmd_update(&mut self) -> Result<()> {
-        let workshop_ids: Vec<String> = self.metadata.keys().cloned().collect();
+    async fn cmd_update(&mut self, args: &[&str]) -> Result<()> {
+        let force = args.contains(&"-f") || args.contains(&"--force");
 
+        let workshop_ids: Vec<String> = self.metadata.keys().cloned().collect();
         if workshop_ids.is_empty() {
             println!("No subscribed items. Use 'download <id>' to add items.");
             return Ok(());
         }
 
-        println!("Checking {} items for updates...", workshop_ids.len());
+        println!(
+            "Updating {} items{}...",
+            workshop_ids.len(),
+            if force { " (forced)" } else { "" }
+        );
 
         for workshop_id in &workshop_ids {
-            match self
-                .parse_workshop_item(workshop_id)
-                .await
-                .context("Failed to fetch workshop information")?
-            {
-                ParseResult::Item(item) => {
-                    self.download_item(item, None).await?;
-                }
-                _ => {}
+            if let ParseResult::Item(item) = self.parse_workshop_item(workshop_id).await? {
+                self.download_item(item, None, force).await?;
             }
         }
-
         Ok(())
     }
 
@@ -737,46 +811,6 @@ impl WorkshopManager {
         Ok(())
     }
 
-    fn generate_workshop_maps_content(&self) -> (String, usize) {
-        let mut content = String::from("\"WorkshopMaps\"\n{\n");
-        let mut map_count = 0;
-
-        for (workshop_id, metadata) in &self.metadata {
-            if let Some(map_name) = self.extract_map_name(metadata) {
-                content.push_str(&format!("\t\"{}\"\t\t\"{}\"\n", map_name, workshop_id));
-                map_count += 1;
-            }
-        }
-
-        content.push_str("}\n");
-        (content, map_count)
-    }
-
-    async fn write_workshop_maps(&self, content: &str) -> Result<()> {
-        for cfg_path in &self.paths.workshop_cfgs {
-            if let Some(parent) = cfg_path.parent() {
-                fs::create_dir_all(parent).await?;
-            }
-
-            fs::write(cfg_path, content).await.with_context(|| {
-                format!("Failed to write workshop maps to {}", cfg_path.display())
-            })?;
-        }
-        Ok(())
-    }
-
-    async fn cmd_generate(&self) -> Result<()> {
-        let (content, map_count) = self.generate_workshop_maps_content();
-        self.write_workshop_maps(&content).await?;
-
-        println!(
-            "Generated workshop maps in {} locations with {} map entries",
-            self.paths.workshop_cfgs.len(),
-            map_count
-        );
-        Ok(())
-    }
-
     fn extract_map_name(&self, metadata: &WorkshopMetadata) -> Option<String> {
         metadata
             .files
@@ -793,7 +827,6 @@ impl WorkshopManager {
         println!("  list [-v]       - List subscribed items (use -v for details)");
         println!("  remove <id>     - Remove workshop item or collection");
         println!("                    (collections remove orphaned items)");
-        println!("  generate        - Generate workshop_maps.txt file");
         println!("  info            - Show configuration and status information");
         println!("  help            - Show this help");
         println!("  exit            - Exit application");
@@ -808,13 +841,11 @@ impl WorkshopManager {
 
         match parts[0].to_lowercase().as_str() {
             "download" => {
-                if let Some(id) = parts.get(1) {
-                    self.cmd_download(id).await?;
-                } else {
-                    println!("Usage: download <workshop_id>");
-                }
+                self.cmd_download(&parts[1..]).await?;
             }
-            "update" => self.cmd_update().await?,
+            "update" => {
+                self.cmd_update(&parts[1..]).await?;
+            }
             "list" => {
                 let verbose = parts.contains(&"-v") || parts.contains(&"--verbose");
                 self.cmd_list(verbose).await?;
@@ -826,7 +857,6 @@ impl WorkshopManager {
                     println!("Usage: remove <workshop_id>");
                 }
             }
-            "generate" => self.cmd_generate().await?,
             "info" => self.cmd_info().await?,
             "help" => self.show_help(),
             "exit" | "quit" => return Ok(false),

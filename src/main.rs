@@ -15,6 +15,7 @@ use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::Duration;
+use path_clean::PathClean;
 
 #[derive(Parser)]
 #[command(name = "workshop_manager")]
@@ -98,52 +99,69 @@ enum ParseResult {
 
 pub struct WorkshopManager {
     config: Config,
-    paths: ManagerPaths,
+    paths: PathManager,
     metadata: HashMap<String, WorkshopMetadata>,
     client: reqwest::Client,
     whitelist: Option<GlobSet>,
 }
 
-struct ManagerPaths {
+struct PathManager {
     local_files: PathBuf,
     steamcmd: PathBuf,
     metadata_file: PathBuf,
     workshop_maps_file: PathBuf,
 }
 
-impl ManagerPaths {
+impl PathManager {
     fn new(config: &Config) -> Result<Self> {
-        let current_dir = std::env::current_dir().context("Failed to get current directory")?;
-        let steamcmd = PathBuf::from(&config.steam_cmd);
+        let exe_dir = std::env::current_exe()
+            .context("Failed to get executable path")?
+            .parent()
+            .context("Couldn't fetch parent directory for executable")?
+            .to_path_buf()
+            .clean();
 
         Ok(Self {
-            local_files: PathBuf::from(&config.output_dir),
-            steamcmd,
-            metadata_file: current_dir.join("metadata.json"),
-            workshop_maps_file: PathBuf::from(&config.output_dir).join("workshop_maps.txt"),
+            local_files: Self::resolve_path(&config.output_dir, &exe_dir),
+            steamcmd: Self::resolve_path(&config.steam_cmd, &exe_dir),
+            metadata_file: exe_dir.join("metadata.json").clean(),
+            workshop_maps_file: Self::resolve_path(&config.output_dir, &exe_dir)
+                .join("workshop_maps.txt")
+                .clean(),
         })
     }
 
+    fn resolve_path(path: &str, base_dir: &Path) -> PathBuf {
+        let path = Path::new(path);
+        if path.is_absolute() {
+            path.to_path_buf().clean()
+        } else {
+            base_dir.join(path).clean()
+        }
+    }
+
     fn steamcmd_workshop_path(&self, appid: &str, workshop_id: &str) -> Result<PathBuf> {
-        let parent = self
-            .steamcmd
+        let steamcmd_dir = self.steamcmd
             .parent()
             .context("Steam CMD path has no parent directory")?;
-        Ok(parent
+       
+        Ok(steamcmd_dir
             .join("necodl")
             .join("steamapps")
             .join("workshop")
             .join("content")
             .join(appid)
-            .join(workshop_id))
+            .join(workshop_id)
+            .clean())
     }
 }
+
 
 impl WorkshopManager {
     pub async fn new() -> Result<Self> {
         let config = Self::load_config().await?;
         Self::validate_config(&config)?;
-        let paths = ManagerPaths::new(&config)?;
+        let paths = PathManager::new(&config)?;
 
         fs::create_dir_all(&paths.local_files)
             .await
@@ -181,9 +199,18 @@ impl WorkshopManager {
     }
 
     async fn load_config() -> Result<Config> {
-        let content = fs::read_to_string("config.toml")
+        let exe_dir = std::env::current_exe()
+            .context("Failed to get executable path")?
+            .parent()
+            .context("Couldn't fetch parent directory for executable")?
+            .to_path_buf();
+
+        let config_path = exe_dir.join("config.toml");
+
+        let content = fs::read_to_string(&config_path)
             .await
             .context("Failed to read config.toml")?;
+
         toml::from_str(&content).context("Failed to parse config.toml")
     }
 
@@ -360,7 +387,7 @@ impl WorkshopManager {
                 )
             })?;
 
-        // println!("Updated workshop_maps.txt with {} map entries", map_count);
+        println!("Updated workshop_maps.txt with {} map entries", map_count);
         Ok(())
     }
 
@@ -802,7 +829,10 @@ impl WorkshopManager {
         }
 
         self.save_metadata().await?;
-        println!("Imported {} workshop IDs. Use 'update' to download them", imported_count);
+        println!(
+            "Imported {} workshop IDs. Use 'update' to download them",
+            imported_count
+        );
         Ok(())
     }
 

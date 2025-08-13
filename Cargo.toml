@@ -18,3 +18,4 @@ sha2 = "0.10.8"
 scraper = "0.23.1"
 globset = "0.4.16"
 clap = { version = "4.0", features = ["derive"] }
+path-clean = "1.0.1"

@@ -712,6 +712,7 @@ impl WorkshopManager {
 
         println!("Successfully downloaded {}", item.id);
         self.save_metadata().await?;
+        self.update_workshop_maps().await?;
         Ok(true)
     }
 

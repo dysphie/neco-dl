@@ -16,11 +16,12 @@ It acts as a full replacement for your server's addon manager, you can subscribe
 3. Configure `config.toml`:
 
 ```toml
-steam_cmd = "./steamcmd/steamcmd.exe"  # path to steamcmd (.exe or .sh)
-output_dir = "./downloads"             # where downloaded files go (typically your server root)
-appid = "224260"
+steam_cmd = "path/to/steamcmd.sh"       # path to steamcmd (.exe or .sh)
+output_dir = "path/to/output/dir"       # directory to place generated files
+appid = "224260"                        # game AppID, e.g. 440 (TF2), 730 (CS:GO)
 
 # only allow these files to be downloaded
+# never allow everything unless you understand the security risks!
 whitelist = [
     "maps/*.nmo",
     "maps/*.nav",

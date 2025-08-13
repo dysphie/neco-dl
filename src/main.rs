@@ -349,12 +349,10 @@ impl WorkshopManager {
 
     async fn update_workshop_maps(&self) -> Result<()> {
         let mut content = String::from("\"WorkshopMaps\"\n{\n");
-        // let mut map_count = 0;
 
         for (workshop_id, metadata) in &self.metadata {
             if let Some(map_name) = self.extract_map_name(metadata) {
                 content.push_str(&format!("\t\"{}\"\t\t\"{}\"\n", map_name, workshop_id));
-                // map_count += 1;
             }
         }
 
@@ -373,7 +371,6 @@ impl WorkshopManager {
                 )
             })?;
 
-        // println!("Updated workshop_maps.txt with {} map entries", map_count);
         Ok(())
     }
 
@@ -540,29 +537,13 @@ impl WorkshopManager {
     }
 
     fn display_config_info(&self) {
-        println!("\n{:-<60}", " CONFIGURATION ");
         println!("{:<25}: {}", "App ID", self.config.appid);
-        println!("{:<25}: {}", "SteamCMD Path", self.config.steam_cmd);
-        println!("{:<25}: {}", "Download Directory", self.config.output_dir);
-    }
-
-    fn display_paths_info(&self) {
-        println!("\n{:-<60}", " PATHS ");
-        println!(
-            "{:<25}: {}",
-            "Metadata File",
-            self.paths.metadata_file.display()
-        );
-        println!(
-            "{:<25}: {}",
-            "Local Files",
-            self.paths.local_files.display()
-        );
+        println!("{:<25}: {}", "Metadata File", self.paths.metadata_file.display());
+        println!("{:<25}: {}", "Output Folder", self.paths.local_files.display());
         println!("{:<25}: {}", "SteamCMD", self.paths.steamcmd.display());
     }
 
     async fn display_subscription_info(&self) -> Result<()> {
-        println!("\n{:-<60}", " SUBSCRIPTIONS ");
         println!("{:<25}: {}", "Total Subscriptions", self.metadata.len());
         Ok(())
     }
@@ -593,8 +574,6 @@ impl WorkshopManager {
     }
 
     async fn display_storage_info(&self) -> Result<()> {
-        println!("\n{:-<60}", " STORAGE ");
-
         let output_dir = &self.paths.local_files;
         let used_space = self.calculate_directory_size(output_dir).await?;
 
@@ -606,7 +585,6 @@ impl WorkshopManager {
 
     async fn cmd_info(&self) -> Result<()> {
         self.display_config_info();
-        self.display_paths_info();
         self.display_subscription_info().await?;
         self.display_storage_info().await?;
         Ok(())

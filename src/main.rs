@@ -114,45 +114,31 @@ struct PathManager {
 
 impl PathManager {
     fn new(config: &Config) -> Result<Self> {
-        let exe_dir = std::env::current_exe()
-            .context("Failed to get executable path")?
+        let exe_dir = std::env::current_exe()?
             .parent()
-            .context("Couldn't fetch parent directory for executable")?
+            .context("Executable has no parent dir")?
             .to_path_buf()
             .clean();
 
+        let local_files = exe_dir.join(&config.output_dir).clean();
+        let workshop_maps = local_files.join("workshop_maps.txt").clean();
+
         Ok(Self {
-            local_files: Self::resolve_path(&config.output_dir, &exe_dir),
-            steamcmd: Self::resolve_path(&config.steam_cmd, &exe_dir),
+            local_files,
+            steamcmd: exe_dir.join(&config.steam_cmd).clean(),
             metadata_file: exe_dir.join("metadata.json").clean(),
-            workshop_maps_file: Self::resolve_path(&config.output_dir, &exe_dir)
-                .join("workshop_maps.txt")
-                .clean(),
+            workshop_maps_file: workshop_maps,
         })
     }
 
-    fn resolve_path(path: &str, base_dir: &Path) -> PathBuf {
-        let path = Path::new(path);
-        if path.is_absolute() {
-            path.to_path_buf().clean()
-        } else {
-            base_dir.join(path).clean()
-        }
-    }
-
-    fn steamcmd_workshop_path(&self, appid: &str, workshop_id: &str) -> Result<PathBuf> {
-        let steamcmd_dir = self.steamcmd
+    fn steamcmd_workshop_path(&self, appid: &str, workshop_id: &str) -> PathBuf {
+        self.steamcmd
             .parent()
-            .context("Steam CMD path has no parent directory")?;
-       
-        Ok(steamcmd_dir
-            .join("necodl")
-            .join("steamapps")
-            .join("workshop")
-            .join("content")
+            .expect("SteamCMD path has parent") 
+            .join("necodl/steamapps/workshop/content")
             .join(appid)
             .join(workshop_id)
-            .clean())
+            .clean()
     }
 }
 
@@ -363,12 +349,12 @@ impl WorkshopManager {
 
     async fn update_workshop_maps(&self) -> Result<()> {
         let mut content = String::from("\"WorkshopMaps\"\n{\n");
-        let mut map_count = 0;
+        // let mut map_count = 0;
 
         for (workshop_id, metadata) in &self.metadata {
             if let Some(map_name) = self.extract_map_name(metadata) {
                 content.push_str(&format!("\t\"{}\"\t\t\"{}\"\n", map_name, workshop_id));
-                map_count += 1;
+                // map_count += 1;
             }
         }
 
@@ -387,7 +373,7 @@ impl WorkshopManager {
                 )
             })?;
 
-        println!("Updated workshop_maps.txt with {} map entries", map_count);
+        // println!("Updated workshop_maps.txt with {} map entries", map_count);
         Ok(())
     }
 
@@ -699,10 +685,7 @@ impl WorkshopManager {
             return Ok(false);
         }
 
-        let source_path = self
-            .paths
-            .steamcmd_workshop_path(&self.config.appid, &item.id)
-            .context("Failed to compute SteamCMD workshop path")?;
+        let source_path = self.paths.steamcmd_workshop_path(&self.config.appid, &item.id);
 
         if !fs::try_exists(&source_path).await? {
             eprintln!("Downloaded files not found at expected location");

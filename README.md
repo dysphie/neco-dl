@@ -7,15 +7,12 @@ A CLI Workshop addon manager for Source Engine dedicated servers.
 I built this as a workaround to recent Steam API issues where valid Workshop entries fail to return data, breaking built-in tools.  
 It acts as a full replacement for your server's addon manager, you can subscribe to Workshop items or collections by ID and manage them via commands.  
 
-> ⚠️ If you use this for No More Room in Hell, it will **overwrite `workshop_maps.txt` completely**. Back it up before installing.
-
 ---
 
 ## Installation & Setup
 
 1. Install SteamCMD: [Downloading SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD#Downloading_SteamCMD)  
-2. Download the latest NecoDL executable from [releases](https://github.com/dysphie/neco-dl/releases).  
-   * Place it anywhere—it **does not** need to be in your server root.  
+2. Download the latest NecoDL executable from [releases](https://github.com/dysphie/neco-dl/releases).
 3. Configure `config.toml`:
 
 ```toml
@@ -33,9 +30,11 @@ whitelist = [
 ]
 ```
 
-> ⚠️ Tip: `output_dir` is usually your server root, but it can be anywhere.
-> You can keep downloads in a separate folder and mount it in `gameinfo.txt` with `game+mod <path>` so the server(s) can access the files.
+> [!TIP]
+> `output_dir` is usually your server root, but you can use a separate folder and mount it in `gameinfo.txt` with `game+mod <path>` so the server(s) can still access the files.
 
+> [!WARNING]
+> If you use this for No More Room in Hell, it will overwrite the server's `workshop_maps.txt`. Back it up before installing.
 
 4. Run NecoDL:
 
@@ -45,16 +44,17 @@ whitelist = [
 ---
 
 ## Commands
+| Command         | Description                                                   |
+| --------------- | ------------------------------------------------------------- |
+| `download <id>` | Download a Workshop item or collection of items              <br>`-f`: Redownload even if up-to-date |
+| `update`        | Update all subscribed items                                   <br>`-f`: Redownload even if up-to-date |
+| `list`          | Show subscribed items                                        <br>`-v`: Display detailed file info |
+| `remove <id>`   | Unsubscribe + delete files (cleans orphaned collection items) |
+| `info`          | Display config, storage usage, and stats                      |
+| `import <path>` | Import workshop IDs from `workshop_maps.txt` (NMRiH)          |
+| `help`          | Show this command reference                                   |
+| `exit`          | Exit                                                          |
 
-| Command         | Description                                                   | Flags & Options                              |
-| --------------- | ------------------------------------------------------------- | -------------------------------------------- |
-| `download <id>` | Download a Workshop item or collection of items               | `-f, --force`: Redownload even if up-to-date |
-| `update`        | Update all subscribed items                                   | `-f, --force`: Redownload even if up-to-date |
-| `list`          | Show subscribed items                                         | `-v, --verbose`: Display detailed file info  |
-| `remove <id>`   | Unsubscribe + delete files (cleans orphaned collection items) |                                              |
-| `info`          | Display config, storage usage, and stats                      |                                              |
-| `help`          | Show this command reference                                   |                                              |
-| `exit`/`quit`   | Exit                                                          |                                              |
 
 ---
 
@@ -77,3 +77,7 @@ whitelist = [
 ```bash
 0 * * * * /path/to/necodl update
 ```
+## Notes
+
+Inspired by the Workshop addon managers from [No More Room in Hell](https://store.steampowered.com/app/224260/No_More_Room_in_Hell/) and [Pirates, Vikings, and Knights II](https://store.steampowered.com/app/253210/Pirates_Vikings_and_Knights_II/) by [felis-catus](https://github.com/felis-catus)
+

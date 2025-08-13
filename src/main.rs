@@ -1,6 +1,5 @@
 // TODO
 // - reuse steamcmd process
-// - clap crate
 
 use anyhow::{Context, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -15,6 +14,37 @@ use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::Duration;
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(name = "workshop_manager")]
+#[command(about = "Steam Workshop Manager", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Download {
+        workshop_id: String,
+        #[arg(short, long)]
+        force: bool,
+    },
+    Update {
+        #[arg(short, long)]
+        force: bool,
+    },
+    List {
+        #[arg(short, long)]
+        verbose: bool,
+    },
+    Remove {
+        workshop_id: String,
+    },
+    Info,
+}
+
 
 static TITLE_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse(".workshopItemTitle").unwrap());
@@ -908,11 +938,34 @@ Type 'help' for available commands.
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let cli = Cli::parse();
+
     let mut manager = WorkshopManager::new()
         .await
         .context("Failed to initialize workshop manager")?;
 
-    manager.run().await
+    match cli.command {
+        Some(Commands::Download { workshop_id, force }) => {
+            manager.download_generic(&workshop_id, force).await?;
+        }
+        Some(Commands::Update { force }) => {
+            manager.cmd_update(&if force { vec!["--force"] } else { vec![] }).await?;
+        }
+        Some(Commands::List { verbose }) => {
+            manager.cmd_list(verbose).await?;
+        }
+        Some(Commands::Remove { workshop_id }) => {
+            manager.cmd_remove(&workshop_id).await?;
+        }
+        Some(Commands::Info) => {
+            manager.cmd_info().await?;
+        }
+        None => {
+            manager.run().await?; // interactive mode
+        }
+    }
+
+    Ok(())
 }
 
 fn format_file_size(bytes: u64) -> String {

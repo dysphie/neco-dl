@@ -1,55 +1,79 @@
-
 <img height="128" alt="necoDL icon" src="https://github.com/user-attachments/assets/65c94234-faca-4b64-9487-e91cf232f543" />
 
 # NecoDL
 
-A CLI Workshop addon manager for Source Engine Dedicated Servers.
+A CLI Workshop addon manager for Source Engine dedicated servers.  
 
-I built this as a workaround for Steam API issues where valid workshop entries fail to return data, making the built-in workshop tools not work.
+I built this as a workaround to recent Steam API issues where valid Workshop entries fail to return data, breaking built-in tools.  
+It acts as a full replacement for your server's addon manager, you can subscribe to Workshop items or collections by ID and manage them via commands.  
+
+> ⚠️ If you use this for No More Room in Hell, it will **overwrite `workshop_maps.txt` completely**. Back it up before installing.
 
 ---
 
-## Usage
+## Installation & Setup
 
-* Grab the latest binary from the [releases](https://github.com/dysphie/neco-dl/releases) page.
-* Adjust the settings in the [config](https://github.com/dysphie/neco-dl?tab=readme-ov-file#config) file.
-* Launch the tool in the terminal with: `./necodl`
+1. Install SteamCMD: [Downloading SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD#Downloading_SteamCMD)  
+2. Download the latest NecoDL executable from [releases](https://github.com/dysphie/neco-dl/releases).  
+   * Place it anywhere—it **does not** need to be in your server root.  
+3. Configure `config.toml`:
+
+```toml
+steam_cmd = "./steamcmd/steamcmd.exe"  # path to steamcmd (.exe or .sh)
+output_dir = "./downloads"             # where downloaded files go (typically your server root)
+appid = "224260"
+
+# only allow these files to be downloaded
+whitelist = [
+    "maps/*.nmo",
+    "maps/*.nav",
+    "maps/*.txt",
+    "maps/*.bsp",
+    "maps/maphacks/**/*.txt"
+]
+```
+
+> ⚠️ Tip: `output_dir` is usually your server root, but it can be anywhere.
+> You can keep downloads in a separate folder and mount it in `gameinfo.txt` with `game+mod <path>` so the server(s) can access the files.
+
+
+4. Run NecoDL:
+
+   * Interactively: `./necodl`
+   * Directly: `./necodl update`
 
 ---
 
 ## Commands
 
-| command              | description                                                                                                                                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `download <file_id>` | Subscribes to a Workshop file and downloads it. If it's a collection, all items are downloaded individually. |
-| `remove <file_id>`   | Unsubscribes from a Workshop file. If it's a collection, all included items are removed (unless shared with another collection)                          |
-| `list`               | Lists all current Workshop subscriptions. Use `-v` for detailed info.                                                                                                                               |
-| `update`             | Updates all existing Workshop subscriptions.                                                                                               |
-| `generate`           | (NMRiH) Generates `workshop_maps.txt` files from your current subscriptions.                                                                                                                             |
-| `info`               | Shows configuration details and current status information.                                                                                                                                         |
-| `help`               | Displays the list of available commands and their descriptions.                                                                                                                                     |
-| `exit`               | Exits the application.                                                                                                                                                                              |
+| Command         | Description                                                   | Flags & Options                              |
+| --------------- | ------------------------------------------------------------- | -------------------------------------------- |
+| `download <id>` | Download a Workshop item or collection of items               | `-f, --force`: Redownload even if up-to-date |
+| `update`        | Update all subscribed items                                   | `-f, --force`: Redownload even if up-to-date |
+| `list`          | Show subscribed items                                         | `-v, --verbose`: Display detailed file info  |
+| `remove <id>`   | Unsubscribe + delete files (cleans orphaned collection items) |                                              |
+| `info`          | Display config, storage usage, and stats                      |                                              |
+| `help`          | Show this command reference                                   |                                              |
+| `exit`/`quit`   | Exit                                                          |                                              |
 
 ---
 
-## Config
+## Examples
 
-Settings are stored in `config.toml`
+* Download a single map, [Subside](https://steamcommunity.com/sharedfiles/filedetails/?id=1480550740):
 
-```toml
-steam_cmd = "./steamcmd/steamcmd.exe" # Path to SteamCMD (.exe or .sh)
-download_dir = "./downloads" # Where to place downloaded files after download
-appid = "224260"
-
-# For NMRiH only:
-# List of workshop_maps.txt files to edit after download
-# Needed so clients download the map on join
-workshop_cfgs = [
-    "./nmrihserver1/workshop_maps.txt",
-    "./nmrihserver2/workshop_maps.txt"
-]
+```bash
+./necodl download 1480550740
 ```
 
-> \[!TIP]
-> Instead of setting your download folder to your server's maps folder, you can dynamically mount it by adding `game+mod <path>` to your `gameinfo.txt`.
+* Update all subscribed maps:
 
+```bash
+./necodl update
+```
+
+* Update maps automatically every hour via cron:
+
+```bash
+0 * * * * /path/to/necodl update
+```

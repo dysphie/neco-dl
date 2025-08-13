@@ -40,7 +40,7 @@ whitelist = [
 4. Run NecoDL:
 
    * Interactively: `./necodl`
-   * Directly: `./necodl update`
+   * Directly: `./necodl info`
 
 ---
 

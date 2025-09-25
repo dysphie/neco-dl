@@ -2,22 +2,35 @@
 
 # NecoDL
 
-A CLI Workshop addon manager for Source Engine dedicated servers.  
+A CLI Workshop addon manager for Source Engine servers.
 
-I built this as a workaround to recent Steam API issues where valid Workshop entries fail to return data, breaking built-in tools.  
-It acts as a full replacement for your server's addon manager, you can subscribe to Workshop items or collections by ID and manage them via commands.  
+I made this due to Steam API issues with [No More Room in Hell](https://steamcommunity.com/app/224260/workshop/) where recent workshop entries fail to download via the built-in server commands, but it should work for any game.
+You can subscribe to Workshop items or collections by ID and manage them via [commands](#commands).  
 
 ---
 
 ## Installation & Setup
 
 1. Install SteamCMD: [Downloading SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD#Downloading_SteamCMD)  
-2. Download the latest NecoDL executable from [releases](https://github.com/dysphie/neco-dl/releases).
-3. Configure `config.toml`:
+2. Download the latest NecoDL executable from [releases](https://github.com/dysphie/neco-dl/releases).  
+3. Configure `config.toml` (see [example](#configuration)).  
+4. (No More Room in Hell only) Install [Metamod](https://www.sourcemm.net/downloads.php/?branch=stable) and [Sourcemod](https://www.sourcemm.net/downloads.php?branch=stable), then copy **necodl.smx** to `addons/sourcemod/plugins`.  
+5. Run NecoDL:  
+   * Interactively: `./necodl`  
+   * Directly: `./necodl info`  
+
+> [!WARNING]  
+> If you use this for No More Room in Hell, it will overwrite the server's `workshop_maps.txt`. Back it up before installing.
+
+---
+
+## Configuration
+
+Edit `config.toml` to set up paths and filters:
 
 ```toml
 steam_cmd = "path/to/steamcmd.sh"       # path to steamcmd (.exe or .sh)
-output_dir = "path/to/output/dir"       # directory to place generated files
+output_dir = "path/to/output/dir"       # directory to place generated files, usually your server's root
 appid = "224260"                        # game AppID, e.g. 440 (TF2), 730 (CS:GO)
 
 # only allow these files to be downloaded
@@ -29,33 +42,25 @@ whitelist = [
     "maps/*.bsp",
     "maps/maphacks/**/*.txt"
 ]
-```
+````
 
 > [!TIP]
-> `output_dir` is usually your server root, but you can use a separate folder and mount it in `gameinfo.txt` with `game+mod <path>` so the server(s) can still access the files.
-
-> [!WARNING]
-> If you use this for No More Room in Hell, it will overwrite the server's `workshop_maps.txt`. Back it up before installing.
-
-4. Run NecoDL:
-
-   * Interactively: `./necodl`
-   * Directly: `./necodl info`
+> You can also download files to a separate folder and mount it to your server by adding it to `gameinfo.txt` as the first entry with `game+mod <path/to/output/dir>`
 
 ---
 
 ## Commands
-| Command         | Description                                                   |
-| --------------- | ------------------------------------------------------------- |
-| `download <id>` | Download a Workshop item or collection of items              <br>`-f`: Redownload even if up-to-date |
-| `update`        | Update all subscribed items                                   <br>`-f`: Redownload even if up-to-date |
-| `list`          | Show subscribed items                                        <br>`-v`: Display detailed file info |
-| `remove <id>`   | Unsubscribe + delete files (cleans orphaned collection items) |
-| `info`          | Display config, storage usage, and stats                      |
-| `import <path>` | Import workshop IDs from `workshop_maps.txt` (NMRiH)          |
-| `help`          | Show this command reference                                   |
-| `exit`          | Exit                                                          |
 
+| Command         | Description                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| `download <id>` | Download a Workshop item or collection of items              <br>`-f`: Redownload even if up-to-date  |
+| `update`        | Update all subscribed items                                   <br>`-f`: Redownload even if up-to-date |
+| `list`          | Show subscribed items                                        <br>`-v`: Display detailed file info     |
+| `remove <id>`   | Unsubscribe + delete files (cleans orphaned collection items)                                         |
+| `info`          | Display config, storage usage, and stats                                                              |
+| `import <path>` | Import workshop IDs from `workshop_maps.txt` (NMRiH)                                                  |
+| `help`          | Show this command reference                                                                           |
+| `exit`          | Exit                                                                                                  |
 
 ---
 
@@ -78,6 +83,9 @@ whitelist = [
 ```bash
 0 * * * * /path/to/necodl update
 ```
+
+---
+
 ## Notes
 
 Inspired by the Workshop addon managers from [No More Room in Hell](https://store.steampowered.com/app/224260/No_More_Room_in_Hell/) and [Pirates, Vikings, and Knights II](https://store.steampowered.com/app/253210/Pirates_Vikings_and_Knights_II/) by [felis-catus](https://github.com/felis-catus)
